@@ -1,14 +1,14 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
 author: "Gustavo Gialluisi"
-date: "Friday, March 13, 2015"
+date: "April 06, 2015"
 output: html_document
 keep_md: true
 ---
 
 # Reproducible Research: Peer Assessment 1
 #### *Gustavo Gialluisi*
-#### *Friday, March 13, 2015*
+#### *April 06, 2015*
 
 This assignment is about using knitr to build this report with answers to the following questions:  
 - Loading and preprocessing the data  
@@ -20,11 +20,12 @@ This assignment is about using knitr to build this report with answers to the fo
 
 ## Loading and preprocessing the data
 
-Let's first load all required R packages, on silent mode...
+Let's first load all required R packages, on silent mode:
 
 ```r
 require(plyr)
 require(ggplot2)
+library(lubridate)
 ```
 
 The file [**activity.zip**](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) is required here.  
@@ -48,6 +49,16 @@ To count NA values, we'll need a column:
 activity$is_NA <- is.na(activity$steps)
 ```
 
+
+Convert date *string* to *datetime*,  
+and convert the interval to datetime to assure correct display in graph:
+
+```r
+activity$date <- as.Date(activity$date)
+activity$interval <- parse_date_time(sprintf("%04d", activity$interval), orders="hm")
+```
+
+
 Have a look at the data:
 
 ```r
@@ -57,8 +68,8 @@ str(activity)
 ```
 ## 'data.frame':	17568 obs. of  4 variables:
 ##  $ steps   : int  NA NA NA NA NA NA NA NA NA NA ...
-##  $ date    : Factor w/ 61 levels "2012-10-01","2012-10-02",..: 1 1 1 1 1 1 1 1 1 1 ...
-##  $ interval: int  0 5 10 15 20 25 30 35 40 45 ...
+##  $ date    : Date, format: "2012-10-01" "2012-10-01" ...
+##  $ interval: POSIXct, format: "0000-01-01 00:00:00" "0000-01-01 00:05:00" ...
 ##  $ is_NA   : logi  TRUE TRUE TRUE TRUE TRUE TRUE ...
 ```
 
@@ -102,7 +113,7 @@ ggplot(stepsperday, aes(x=totalsteps)) +
     labs(title = "Total number of steps taken each day", x = "Total Steps / Day")
 ```
 
-![plot of chunk unnamed-chunk-7](figure/unnamed-chunk-7-1.png) 
+![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png) 
    
 Mean: <span style="color:red">**9354.23**</span>  
 Median: <span style="color:blue">**10395**</span>  
@@ -127,7 +138,7 @@ ggplot(avgstepsperinterval, aes(x=interval, y=avg.interval.steps)) +
          x = "5-minute interval", y = "total steps\naveraged across all days")
 ```
 
-![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png) 
+![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png) 
 
   
 Verify which interval contains tha maximum value of the steps average:
@@ -139,11 +150,11 @@ theinterval
 ```
 
 ```
-##     interval avg.interval.steps
-## 104      835           206.1698
+##                interval avg.interval.steps
+## 104 0000-01-01 08:35:00           206.1698
 ```
 
-The 5-minute interval that contains, on average across all the days in the dataset, the maximum number of steps (**206.1698**) is: **835**.  
+The 5-minute interval that contains, on average across all the days in the dataset, the maximum number of steps (**206.1698**) is: **0000-01-01 08:35:00**.  
     
     
 ## Imputing missing values
@@ -213,7 +224,7 @@ ggplot(stepsperday_fi, aes(x=totalsteps)) +
     labs(title = "Total number of steps taken each day (filled-in data)", x = "Total Steps per Day")
 ```
 
-![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png) 
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png) 
 
 
 With the filled-in dataset now we have a nicer distribution, and this mean and median values:    
@@ -226,44 +237,11 @@ Median: <span style="color:blue">**10641**</span>
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
-- in order to say if a day is weekend or not, I'll have to check for the weekday name. To make this code work everywhere, I'll have to make a little *save-change-restore* work with language settings. I would turn off echo on this, if it was not explicity asked not to use echo = FALSE... Sorry for any over purism...
-
-
-```r
-# store language settings
-user_lang <- Sys.getlocale("LC_TIME")
-
-# set locale to english to correct weekdays names
-Sys.setlocale("LC_TIME", "English")
-```
-
 - Create the weekend factor column:  
 
 
 ```r
-#TRUE for weekend, FALSE for weekday
-activity_fi$weekend <-  weekdays(as.Date(activity$date, format = "%Y-%m-%d"), TRUE) %in% c("Sun", "Sat")
-
-#change values, TRUE for "weekend" and FALSE for "weekday"
-activity_fi[activity_fi$weekend,]$weekend <- "weekend"
-activity_fi[activity_fi$weekend=="FALSE",]$weekend <- "weekday"
-
-#column type needs to be factor
-activity_fi$weekend <- factor(activity_fi$weekend)
-
-# sorry for hard R here...
-# hope to learn a better command 
-# evaluating you, dear peers...tks
-```
-
-- restore language settings...  
-
-```r
-Sys.setlocale("LC_TIME", user_lang)
-```
-
-```
-## [1] "English_United States.1252"
+activity_fi$daytype <- as.factor( ifelse(wday(activity_fi$date) %in% c(1,7),"weekend", "weekday" ) )
 ```
 
 
@@ -271,18 +249,18 @@ Sys.setlocale("LC_TIME", user_lang)
 
 ```r
 avgstepsperinterval_fi <- ddply(activity_fi, 
-                                .(interval, weekend), 
+                                .(interval, daytype), 
                                 summarize, 
                                 avg.interval.steps = mean(steps, na.rm = TRUE))
 
 
 ggplot(avgstepsperinterval_fi, aes(x=interval, y=avg.interval.steps)) +
-    facet_grid(weekend ~ .) +
+    facet_grid(daytype ~ .) +
     geom_line() +
     labs(title = "Average number of steps taken\nper 5-minute interval across weekdays and weekends", 
          x = "5-minute interval", y = "total steps\navg. across weekdays and weekends")
 ```
 
-![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png) 
+![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png) 
 
-The plot above indicates differences in activity patterns between weekdays and weekends, it seems that we walk less on weekends...
+The plot above indicates differences in activity patterns between weekdays and weekends.
